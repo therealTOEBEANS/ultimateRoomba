@@ -2,13 +2,13 @@
 
 ################################################################################
 #
-#                           ultimateRoomba v1.5
+#                           ultimateRoomba v1.7
 #
 #   A smart, drive-aware cleaning script for Linux Mint.
 #
-#   - v1.5: Reorganized menu into .cache and .config sections, sorted by
-#           sensitivity. Added new cleaning targets from .config like
-#           Retroarch history, VLC history, and Electron app caches.
+#   - v1.7: Implemented a new category-based selection system using
+#           single QWERTY letters (Q,W,E,R,T) for faster use. Reorganized
+#           all cleaning tasks into these new categories.
 #
 ################################################################################
 
@@ -130,34 +130,11 @@ clean_path_list() {
     run_with_spinner_and_timer "$title..." "$cmd"
 }
 
-
 # --- Cleaning Functions ---
 
-# --- .cache targets ---
-clean_browser_caches() {
-    local paths=("$HOME/.cache/mozilla/firefox" "$HOME/.cache/chromium")
-    clean_path_list "1. Cleaning Browser Caches" "${paths[@]}"
-}
-clean_thumbnail_cache() {
-    local dir="$HOME/.cache/thumbnails"
-    if [ ! -d "$dir" ]; then echo "2. Thumbnail Cache... Not found, skipping."; return; fi
-    run_with_spinner_and_timer "2. Cleaning Thumbnail Cache..." "smart_delete_dir '$dir' && mkdir -p '$dir'"
-}
-clean_multimedia_caches() {
-    local paths=("$HOME/.cache/gstreamer-1.0" "$HOME/.cache/mpv" "$HOME/.cache/hypnotix" "$HOME/.cache/xreader")
-    clean_path_list "3. Cleaning Multimedia Caches" "${paths[@]}"
-}
-clean_graphics_caches() {
-    local paths=("$HOME/.cache/mesa_shader_cache" "$HOME/.cache/nvidia")
-    clean_path_list "4. Cleaning Graphics & Shader Caches" "${paths[@]}"
-}
-clean_app_logs() {
-    local paths=("$HOME/.cache/nordvpn")
-    clean_path_list "5. Cleaning Application Logs" "${paths[@]}"
-}
-
-# --- .config targets ---
+# Category: [Q] - Browsers
 clean_browser_history() {
+    local title="Cleaning Browser History & Bookmarks"
     local cmd=""
     local ff_hist=$(find "$HOME/.mozilla/firefox" -name "places.sqlite" -type f)
     if [ -n "$ff_hist" ]; then
@@ -166,58 +143,62 @@ clean_browser_history() {
     if [ -f "$HOME/.config/chromium/Default/History" ]; then
         cmd+="smart_delete_file '$HOME/.config/chromium/Default/History' && "
     fi
-    
-    if [ -z "$cmd" ]; then echo "6. Browser History & Bookmarks... Not found, skipping."; return; fi
+    if [ -z "$cmd" ]; then echo "$title... Not found, skipping."; return; fi
     cmd+="true"
-    run_with_spinner_and_timer "6. Cleaning Browser History & Bookmarks..." "$cmd"
+    run_with_spinner_and_timer "$title..." "$cmd"
+}
+clean_browser_caches() {
+    clean_path_list "Cleaning Browser Caches" "$HOME/.cache/mozilla/firefox" "$HOME/.cache/chromium"
+}
+
+# Category: [W] - OS & File History
+empty_trash() {
+    local title="Emptying Trash"
+    local paths=("$HOME/.local/share/Trash/files" "$HOME/.local/share/Trash/info")
+    local cmd=""
+    for path in "${paths[@]}"; do
+        if [ -d "$path" ]; then
+             cmd+="smart_delete_dir '$path' && mkdir -p '$path' && "
+        fi
+    done
+    if [ -z "$cmd" ]; then echo "$title... Not found, skipping."; return; fi
+    cmd+="true"
+    run_with_spinner_and_timer "$title..." "$cmd"
 }
 clean_recently_used() {
-    local file="$HOME/.local/share/recently-used.xbel"
-    if [ ! -f "$file" ]; then echo "7. Recently Used Files... Not found, skipping."; return; fi
-    run_with_spinner_and_timer "7. Cleaning Recently Used Files..." "smart_delete_file '$file' && touch '$file'"
+    clean_path_list "Cleaning Recently Used Files List" "$HOME/.local/share/recently-used.xbel" "$HOME/.local/share/RecentDocuments"
+}
+clean_thumbnail_cache() {
+    local title="Cleaning Thumbnail Cache"
+    local dir="$HOME/.cache/thumbnails"
+    if [ ! -d "$dir" ]; then echo "$title... Not found, skipping."; return; fi
+    run_with_spinner_and_timer "$title..." "smart_delete_dir '$dir' && mkdir -p '$dir'"
 }
 clean_bash_history() {
-    clean_path_list "8. Cleaning Terminal Command History" "$HOME/.bash_history"
+    clean_path_list "Cleaning Terminal Command History" "$HOME/.bash_history"
 }
-clean_retroarch_history() {
-    local files=("$HOME/.config/retroarch/content_history.lpl"
-                 "$HOME/.config/retroarch/content_image_history.lpl"
-                 "$HOME/.config/retroarch/content_music_history.lpl"
-                 "$HOME/.config/retroarch/content_video_history.lpl")
-    clean_path_list "9. Cleaning Retroarch Content History" "${files[@]}"
+
+# Category: [E] - Application History
+clean_file_media_history() {
+    local paths=("$HOME/.local/share/gvfs-metadata" "$HOME/.local/share/vlc/ml.xspf" "$HOME/.config/gtk-3.0/bookmarks" "$HOME/.config/celluloid/watch_later")
+    clean_path_list "Cleaning File Access & Media History" "${paths[@]}"
 }
-clean_misc_app_history() {
-    # This function resets specific app settings known to contain history.
-    local cmd=""
-    local found=false
-    # VLC: Resetting interface config clears recent media list.
-    if [ -f "$HOME/.config/vlc/vlc-qt-interface.conf" ]; then
-        cmd+="smart_delete_file '$HOME/.config/vlc/vlc-qt-interface.conf' && "
-        found=true
-    fi
-    # GTK: Clear file manager bookmarks
-    if [ -f "$HOME/.config/gtk-3.0/bookmarks" ]; then
-        cmd+="smart_delete_file '$HOME/.config/gtk-3.0/bookmarks' && "
-        found=true
-    fi
-    # Celluloid: Clear watch later playlist
-    if [ -d "$HOME/.config/celluloid/watch_later" ]; then
-        cmd+="smart_delete_dir '$HOME/.config/celluloid/watch_later' && "
-        found=true
-    fi
-    
-    if [ "$found" = false ]; then echo "10. Misc App History... Not found, skipping."; return; fi
-    cmd+="true"
-    run_with_spinner_and_timer "10. Cleaning Misc App History (VLC, etc)..." "$cmd"
+clean_p2p_history() {
+    clean_path_list "Cleaning Nicotine+ (P2P) History" "$HOME/.local/share/nicotine"
 }
+clean_chat_logs() {
+    clean_path_list "Cleaning Konversation (IRC) Logs" "$HOME/.local/share/konversation/logs"
+}
+
+# Category: [R] - App Caches & Logs
 clean_electron_apps() {
+    local title="Cleaning Electron App Caches"
     local electron_apps=("VSCodium" "balenaEtcher" "Stacher7" "LM Studio")
     local cmd=""
     local found=false
     for app in "${electron_apps[@]}"; do
         if [ -d "$HOME/.config/$app" ]; then
             found=true
-            # Target common Electron cache and storage folders
             cmd+="smart_delete_dir '$HOME/.config/$app/Cache' &> /dev/null && "
             cmd+="smart_delete_dir '$HOME/.config/$app/Code Cache' &> /dev/null && "
             cmd+="smart_delete_dir '$HOME/.config/$app/GPUCache' &> /dev/null && "
@@ -225,88 +206,88 @@ clean_electron_apps() {
             cmd+="smart_delete_dir '$HOME/.config/$app/Local Storage' &> /dev/null && "
         fi
     done
-
-    if [ "$found" = false ]; then echo "11. Electron App Caches... Not found, skipping."; return; fi
+    if [ "$found" = false ]; then echo "$title... Not found, skipping."; return; fi
     cmd+="true"
-    run_with_spinner_and_timer "11. Cleaning Electron App Caches..." "$cmd"
+    run_with_spinner_and_timer "$title..." "$cmd"
+}
+clean_multimedia_caches() {
+    clean_path_list "Cleaning Multimedia Caches" "$HOME/.cache/gstreamer-1.0" "$HOME/.cache/mpv" "$HOME/.cache/hypnotix" "$HOME/.cache/xreader"
+}
+clean_app_logs() {
+    clean_path_list "Cleaning NordVPN Cache Logs" "$HOME/.cache/nordvpn"
 }
 
+# Category: [T] - Graphics Caches
+clean_graphics_caches() {
+    clean_path_list "Cleaning Graphics & Shader Caches" "$HOME/.cache/mesa_shader_cache" "$HOME/.cache/nvidia"
+}
 
 # --- Main Execution ---
-
 clear
 echo "#########################################################"
-echo "##               ultimateRoomba Cleaner v1.5           ##"
+echo "##               ultimateRoomba Cleaner v1.7           ##"
 echo "#########################################################"
+echo
+echo "Select categories to CLEAN by entering their letters (e.g., QWE)."
 echo
 
 # --- Menu Definition ---
-echo "Select items to OMIT from the cleaning process."
-echo "By default, all items will be cleaned."
-echo
+printf "[Q] - Browsers\n"
+printf "    └─ Browser History & Bookmarks (Firefox, Chromium)\n"
+printf "    └─ Browser Caches (Firefox, Chromium)\n\n"
 
-# .cache items
-echo "--- .cache Folder (Temporary Data & Performance Files) ---"
-declare -a cache_options=(
-    "1. Browser Caches"
-    "   └─ Firefox, Chromium temporary internet files."
-    "2. General Thumbnail Cache"
-    "   └─ Image/video previews from the file manager."
-    "3. Multimedia Caches"
-    "   └─ mpv, gstreamer, xreader, hypnotix."
-    "4. Graphics & Shader Caches"
-    "   └─ Mesa and NVIDIA compiled shaders."
-    "5. Application Logs"
-    "   └─ Log files from specific apps (NordVPN)."
-)
-for item in "${cache_options[@]}"; do echo "$item"; done
-echo
+printf "[W] - OS & File History\n"
+printf "    └─ Empty Trash\n"
+printf "    └─ Recently Used Files List\n"
+printf "    └─ General Thumbnail Cache\n"
+printf "    └─ Terminal Command History\n\n"
 
-# .config items
-echo "--- .config Folder (Activity History & Settings) ---"
-declare -a config_options=(
-    "6. Browser History & Bookmarks"
-    "   └─ WARNING: Deletes visited sites AND all bookmarks."
-    "7. Recently Used Files List"
-    "   └─ System-wide list of recently opened files."
-    "8. Terminal Command History"
-    "   └─ Erases commands typed into the terminal."
-    "9. Retroarch Content History"
-    "   └─ Recently played game lists for the emulator."
-    "10. Misc App History (VLC, etc)"
-    "    └─ VLC history, file manager bookmarks, Celluloid."
-    "11. Electron App Caches"
-    "    └─ Caches for VSCodium, Balena Etcher, Stacher7."
-)
-for item in "${config_options[@]}"; do echo "$item"; done
-echo
+printf "[E] - Application History\n"
+printf "    └─ File Access Metadata (GVFS)\n"
+printf "    └─ Media Player History (VLC, Celluloid)\n"
+printf "    └─ Nicotine+ (P2P) Logs & DBs\n"
+printf "    └─ Konversation (IRC) Logs\n\n"
+
+printf "[R] - App Caches & Logs\n"
+printf "    └─ Electron App Caches (VSCodium, Etcher, etc.)\n"
+printf "    └─ Multimedia Caches (GStreamer, MPV, etc.)\n"
+printf "    └─ NordVPN Cache Logs\n\n"
+
+printf "[T] - Graphics Caches\n"
+printf "    └─ Mesa and NVIDIA compiled shaders.\n\n"
 
 # --- User Input ---
-echo "Enter the numbers of the items you wish to SKIP, separated by spaces (e.g., 6 11)."
-read -p "Omit: " -r user_choices
+read -p "Categories to clean: " -r user_input
+user_input_lower=$(echo "$user_input" | tr '[:upper:]' '[:lower:]')
+declare -a functions_to_run=()
 
-declare -a to_run=(1 2 3 4 5 6 7 8 9 10 11)
-for choice in $user_choices; do to_run=(${to_run[@]/$choice/}); done
-
-echo "---------------------------------------------------------"
-echo "Starting cleanup..."
-
-for i in "${to_run[@]}"; do
-    case $i in
-        1) clean_browser_caches ;;
-        2) clean_thumbnail_cache ;;
-        3) clean_multimedia_caches ;;
-        4) clean_graphics_caches ;;
-        5) clean_app_logs ;;
-        6) clean_browser_history ;;
-        7) clean_recently_used ;;
-        8) clean_bash_history ;;
-        9) clean_retroarch_history ;;
-        10) clean_misc_app_history ;;
-        11) clean_electron_apps ;;
-    esac
+# Process each character of the input string to build the list of functions
+for (( i=0; i<${#user_input_lower}; i++ )); do
+  char="${user_input_lower:$i:1}"
+  case $char in
+    q) functions_to_run+=("clean_browser_history" "clean_browser_caches") ;;
+    w) functions_to_run+=("empty_trash" "clean_recently_used" "clean_thumbnail_cache" "clean_bash_history") ;;
+    e) functions_to_run+=("clean_file_media_history" "clean_p2p_history" "clean_chat_logs") ;;
+    r) functions_to_run+=("clean_electron_apps" "clean_multimedia_caches" "clean_app_logs") ;;
+    t) functions_to_run+=("clean_graphics_caches") ;;
+    *) # Ignore invalid characters
+  esac
 done
 
+# Remove duplicate function calls if a user enters a letter twice (e.g., 'qqw')
+unique_functions=($(printf "%s\n" "${functions_to_run[@]}" | sort -u))
+
+# --- Execution Loop ---
+echo "---------------------------------------------------------"
+if [ ${#unique_functions[@]} -eq 0 ]; then
+    echo "No valid categories selected. Exiting."
+else
+    echo "Starting cleanup for selected categories..."
+    for func in "${unique_functions[@]}"; do
+        # Call the function by its name
+        "$func"
+    done
+fi
 echo "---------------------------------------------------------"
 echo "ultimateRoomba has finished."
 echo
